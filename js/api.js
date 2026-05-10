@@ -1,4 +1,4 @@
-const BASE_URL = 'https://task-finance-backend-production.up.railway.app';
+export const BASE_URL = 'https://task-finance-backend-production.up.railway.app';
 
 async function getTasks() {
   const response = await fetch(`${BASE_URL}/tasks`);

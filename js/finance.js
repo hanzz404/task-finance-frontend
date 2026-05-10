@@ -12,10 +12,39 @@ const totalBalance = document.getElementById('total-balance');
 const statusMessage = document.getElementById('status-message');
 let chartUpdater = null;
 
+const FINANCE_CACHE_KEY = 'keepnote-cached-finance';
+
+function saveCachedFinance(items) {
+  try {
+    localStorage.setItem(FINANCE_CACHE_KEY, JSON.stringify(items));
+  } catch (error) {
+    console.warn('Gagal menyimpan cache finance', error);
+  }
+}
+
+function loadCachedFinance() {
+  try {
+    const raw = localStorage.getItem(FINANCE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (error) {
+    console.warn('Gagal memuat cache finance', error);
+    return [];
+  }
+}
+
 async function loadFinance() {
   try {
     setStatusMessage(statusMessage, 'Memuat finance...', 'success');
-    const items = await getFinance();
+    let items = [];
+
+    if (navigator.onLine) {
+      items = await getFinance();
+      saveCachedFinance(items);
+    } else {
+      items = loadCachedFinance();
+      setStatusMessage(statusMessage, 'Offline: Menampilkan data finance terakhir dari cache.', 'success');
+    }
+
     financeList.innerHTML = '';
     financeList.appendChild(renderFinance(items, handleDeleteFinance));
     updateTotalBalance(items);
@@ -24,8 +53,19 @@ async function loadFinance() {
     }
     setStatusMessage(statusMessage, 'Data finance berhasil dimuat.', 'success');
   } catch (error) {
-    setStatusMessage(statusMessage, error.message, 'error');
-    financeList.innerHTML = '';
+    const cached = loadCachedFinance();
+    if (cached.length) {
+      financeList.innerHTML = '';
+      financeList.appendChild(renderFinance(cached, handleDeleteFinance));
+      updateTotalBalance(cached);
+      if (chartUpdater) {
+        chartUpdater(cached);
+      }
+      setStatusMessage(statusMessage, 'Gagal memuat data terbaru, menampilkan cache.', 'error');
+    } else {
+      setStatusMessage(statusMessage, error.message, 'error');
+      financeList.innerHTML = '';
+    }
   }
 }
 
@@ -83,7 +123,7 @@ async function handleAddFinance(event) {
   }
 }
 
-export function setChartUpdater(updater) {
+function setChartUpdater(updater) {
   chartUpdater = updater;
 }
 
@@ -114,4 +154,4 @@ function initFinance() {
   loadFinance();
 }
 
-export { initFinance };
+export { initFinance, loadFinance, setChartUpdater };

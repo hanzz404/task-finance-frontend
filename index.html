@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#fbbc04" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
   <title>Task & Finance Manager</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -22,6 +28,8 @@
         <button type="button" class="nav-button" data-target="finance-panel">Finance</button>
       </nav>
     </header>
+
+    <div id="offline-banner" class="offline-banner hidden" role="status">Kamu sedang offline</div>
 
     <main class="content-wrapper">
       <section id="task-panel" class="panel panel-active" aria-labelledby="task-title">
@@ -94,7 +102,7 @@
               <option value="Tagihan">Tagihan</option>
               <option value="Lainnya">Lainnya</option>
             </select>
-            <input type="text" id="finance-category-custom" placeholder="Isi kategori manual" style="display: none;" />
+            <input type="text" id="finance-category-custom" placeholder="Isi kategori manual" />
             <button type="submit" class="button-primary">Tambahkan Transaksi</button>
           </form>
         </article>

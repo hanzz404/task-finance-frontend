@@ -1,4 +1,4 @@
-function renderTasks(tasks, onDelete) {
+function renderTasks(tasks, onDelete, onToggle) {
   const fragment = document.createDocumentFragment();
 
   if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -12,6 +12,10 @@ function renderTasks(tasks, onDelete) {
   tasks.forEach((task) => {
     const item = document.createElement('li');
     item.className = 'item-card';
+    const completed = Boolean(task.completed);
+    if (completed) {
+      item.classList.add('completed');
+    }
 
     const taskInfo = document.createElement('div');
     taskInfo.className = 'item-info';
@@ -28,15 +32,27 @@ function renderTasks(tasks, onDelete) {
     deadline.className = 'item-meta';
     deadline.textContent = `Deadline: ${task.deadline ? new Date(task.deadline).toLocaleDateString('id-ID') : 'Belum diatur'}`;
 
-    taskInfo.append(title, priority, deadline);
+    const statusLabel = document.createElement('span');
+    statusLabel.className = `item-status ${completed ? 'done' : 'not-done'}`;
+    statusLabel.textContent = completed ? 'Sudah dikerjakan' : 'Belum dikerjakan';
+
+    taskInfo.append(title, priority, deadline, statusLabel);
 
     const actions = document.createElement('div');
     actions.className = 'item-actions';
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'button-complete';
+    toggleButton.textContent = completed ? 'Batalkan' : 'Selesai';
+    toggleButton.addEventListener('click', () => onToggle(task._id || task.id, !completed));
+
     const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
     deleteButton.textContent = 'Hapus';
     deleteButton.addEventListener('click', () => onDelete(task._id || task.id));
-    actions.appendChild(deleteButton);
 
+    actions.append(toggleButton, deleteButton);
     item.append(taskInfo, actions);
     fragment.appendChild(item);
   });

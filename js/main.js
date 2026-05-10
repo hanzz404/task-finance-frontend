@@ -1,6 +1,15 @@
-import { getTasks, addTask, deleteTask } from './api.js';
+import { getTasks, addTask, deleteTask, BASE_URL } from './api.js';
 import { renderTasks, setStatusMessage, showNotification } from './ui.js';
-import { initFinance, setChartUpdater } from './finance.js';
+import { initFinance, loadFinance, setChartUpdater } from './finance.js';
+import {
+  registerServiceWorker,
+  updateOfflineBanner,
+  loadCache,
+  saveCache,
+  queueSyncRequest,
+  requestNotificationPermission,
+  showLocalNotification,
+} from './offline.js';
 
 const taskForm = document.getElementById('task-form');
 const taskTitleInput = document.getElementById('task-title-input');
@@ -11,21 +20,13 @@ const statusMessage = document.getElementById('status-message');
 const navButtons = document.querySelectorAll('.nav-button');
 const financeChartCanvas = document.getElementById('financeChart');
 const financeFilterSelect = document.getElementById('finance-filter');
+
+const TASK_CACHE_KEY = 'keepnote-cached-tasks';
+const TASK_STATUS_KEY = 'keepnote-task-status';
+const TASK_RESET_KEY = 'keepnote-status-reset-date';
 let financeChart = null;
 let currentFinanceItems = [];
-
-async function loadTasks() {
-  try {
-    setStatusMessage(statusMessage, 'Memuat task...', 'success');
-    const tasks = await getTasks();
-    taskList.innerHTML = '';
-    taskList.appendChild(renderTasks(tasks, handleDelete));
-    setStatusMessage(statusMessage, 'Daftar task berhasil dimuat.', 'success');
-  } catch (error) {
-    setStatusMessage(statusMessage, error.message, 'error');
-    taskList.innerHTML = '';
-  }
-}
+let taskStatuses = {};
 
 function switchPanel(targetId) {
   document.querySelectorAll('.panel').forEach((panel) => {
@@ -42,6 +43,50 @@ function setupNavigation() {
     button.addEventListener('click', () => switchPanel(button.dataset.target));
   });
   switchPanel('task-panel');
+}
+
+function getTaskStatus(taskId) {
+  return Boolean(taskStatuses[taskId]);
+}
+
+function saveTaskStatuses() {
+  localStorage.setItem(TASK_STATUS_KEY, JSON.stringify(taskStatuses));
+}
+
+function loadTaskStatuses() {
+  const stored = localStorage.getItem(TASK_STATUS_KEY);
+  taskStatuses = stored ? JSON.parse(stored) : {};
+}
+
+function ensureDailyReset() {
+  const today = new Date().toISOString().slice(0, 10);
+  const lastReset = localStorage.getItem(TASK_RESET_KEY);
+  if (lastReset !== today) {
+    taskStatuses = {};
+    localStorage.setItem(TASK_RESET_KEY, today);
+    saveTaskStatuses();
+    showNotification('Task direset menjadi belum dikerjakan untuk hari ini.', 'success');
+  }
+}
+
+function scheduleMidnightReset() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0);
+  const timeoutMs = nextMidnight.getTime() - now.getTime();
+
+  setTimeout(() => {
+    ensureDailyReset();
+    loadTasks();
+    scheduleMidnightReset();
+  }, timeoutMs);
+}
+
+function mergeStatus(tasks) {
+  return tasks.map((task) => ({
+    ...task,
+    completed: getTaskStatus(task._id || task.id),
+  }));
 }
 
 function getRangeStart(range) {
@@ -193,6 +238,27 @@ function updateChart(finances) {
   });
 }
 
+async function loadTasks() {
+  let tasks = [];
+
+  try {
+    setStatusMessage(statusMessage, 'Memuat task...', 'success');
+    if (navigator.onLine) {
+      tasks = await getTasks();
+      saveCache(TASK_CACHE_KEY, tasks);
+    } else {
+      tasks = loadCache(TASK_CACHE_KEY) || [];
+      setStatusMessage(statusMessage, 'Offline: Menampilkan data terakhir dari cache.', 'success');
+    }
+  } catch (error) {
+    tasks = loadCache(TASK_CACHE_KEY) || [];
+    setStatusMessage(statusMessage, error.message || 'Gagal memuat task, menampilkan cache.', 'error');
+  }
+
+  taskList.innerHTML = '';
+  taskList.appendChild(renderTasks(mergeStatus(tasks), handleDelete, handleToggleTask));
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
 
@@ -211,9 +277,24 @@ async function handleSubmit(event) {
   submitButton.disabled = true;
   submitButton.textContent = 'Loading...';
 
+  const taskData = { title, deadline, priority };
+
   try {
     setStatusMessage(statusMessage, 'Menambahkan task...', 'success');
-    await addTask({ title, deadline, priority });
+    if (!navigator.onLine) {
+      const offlineTask = { _id: `local-${Date.now()}`, ...taskData, completed: false, offline: true };
+      const cached = loadCache(TASK_CACHE_KEY) || [];
+      saveCache(TASK_CACHE_KEY, [...cached, offlineTask]);
+      await queueSyncRequest({ url: `${BASE_URL}/tasks`, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: taskData });
+      showNotification('Kamu sedang offline. Task akan dikirim saat kembali online.', 'success');
+      taskTitleInput.value = '';
+      taskDeadlineInput.value = '';
+      taskPrioritySelect.value = '';
+      await loadTasks();
+      return;
+    }
+
+    await addTask(taskData);
     taskTitleInput.value = '';
     taskDeadlineInput.value = '';
     taskPrioritySelect.value = '';
@@ -227,7 +308,19 @@ async function handleSubmit(event) {
   }
 }
 
+function handleToggleTask(taskId, completed) {
+  taskStatuses[taskId] = completed;
+  saveTaskStatuses();
+  loadTasks();
+  showNotification(`Task ditandai ${completed ? 'sudah dikerjakan' : 'belum dikerjakan'}.`, 'success');
+}
+
 async function handleDelete(taskId) {
+  if (!navigator.onLine) {
+    showNotification('Hapus task memerlukan koneksi internet.', 'error');
+    return;
+  }
+
   try {
     setStatusMessage(statusMessage, 'Menghapus task...', 'success');
     await deleteTask(taskId);
@@ -238,9 +331,37 @@ async function handleDelete(taskId) {
   }
 }
 
-taskForm.addEventListener('submit', handleSubmit);
-setupNavigation();
-setChartUpdater(updateChart);
-financeFilterSelect?.addEventListener('change', () => updateChart(currentFinanceItems));
-loadTasks();
-initFinance();
+function handleNetworkChange() {
+  updateOfflineBanner();
+  if (navigator.onLine) {
+    showNotification('Kamu online lagi.', 'success');
+    requestNotificationPermission();
+    showLocalNotification('KeepNote', 'Kamu kembali online. Sinkronisasi dimulai.');
+    loadTasks();
+    loadFinance();
+  } else {
+    showNotification('Kamu sedang offline.', 'error');
+    loadTasks();
+    loadFinance();
+  }
+}
+
+function setupApp() {
+  loadTaskStatuses();
+  ensureDailyReset();
+  scheduleMidnightReset();
+  updateOfflineBanner();
+  setupNavigation();
+  taskForm.addEventListener('submit', handleSubmit);
+  financeFilterSelect?.addEventListener('change', () => updateChart(currentFinanceItems));
+  setChartUpdater(updateChart);
+  registerServiceWorker();
+  requestNotificationPermission();
+  loadTasks();
+  initFinance();
+  window.addEventListener('online', handleNetworkChange);
+  window.addEventListener('offline', handleNetworkChange);
+}
+
+setupApp();
+
