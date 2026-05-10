@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task & Finance Manager</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>KeepNote</h1>
+          <p>Task & finance tracker minimal</p>
+        </div>
+      </div>
+
+      <nav class="app-nav" aria-label="Main navigation">
+        <button type="button" class="nav-button active" data-target="task-panel">Task</button>
+        <button type="button" class="nav-button" data-target="finance-panel">Finance</button>
+      </nav>
+    </header>
+
+    <main class="content-wrapper">
+      <section id="task-panel" class="panel panel-active" aria-labelledby="task-title">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Task Manager</p>
+            <h2 id="task-title">Kelola tugas Anda</h2>
+          </div>
+          <span class="badge">Simple</span>
+        </div>
+
+        <article class="card card-soft">
+          <form id="task-form" class="form-grid">
+            <input type="text" id="task-title-input" placeholder="Judul tugas" required />
+            <input type="date" id="task-deadline" required />
+            <select id="task-priority" required>
+              <option value="">Pilih prioritas</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <button type="submit" class="button-primary">Tambahkan Task</button>
+          </form>
+        </article>
+
+        <article class="card card-soft mt-16">
+          <h3>Daftar Task</h3>
+          <ul id="task-list" class="item-list"></ul>
+        </article>
+      </section>
+
+      <section id="finance-panel" class="panel" aria-labelledby="finance-title">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Finance Tracker</p>
+            <h2 id="finance-title">Pantau pemasukan & pengeluaran</h2>
+          </div>
+          <span class="badge badge-yellow">Budget</span>
+        </div>
+
+        <article class="card card-soft finance-summary">
+          <p>Total Saldo</p>
+          <strong id="total-balance">Rp 0</strong>
+          <label class="filter-label" for="finance-filter">Lihat history:</label>
+          <select id="finance-filter" class="filter-select" aria-label="Filter history transaksi">
+            <option value="1D">1 Hari</option>
+            <option value="1W">1 Minggu</option>
+            <option value="1M" selected>1 Bulan</option>
+            <option value="1Y">1 Tahun</option>
+          </select>
+          <div class="chart-card">
+            <canvas id="financeChart" aria-label="Chart finance" role="img"></canvas>
+          </div>
+        </article>
+
+        <article class="card card-soft">
+          <form id="finance-form" class="form-grid">
+            <input type="number" id="finance-amount" placeholder="Jumlah" required />
+            <input type="date" id="finance-date" required />
+            <select id="finance-type" required>
+              <option value="">Pilih tipe</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <select id="finance-category" required>
+              <option value="">Pilih kategori</option>
+              <option value="Makanan">Makanan</option>
+              <option value="Transport">Transport</option>
+              <option value="Hiburan">Hiburan</option>
+              <option value="Tagihan">Tagihan</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+            <input type="text" id="finance-category-custom" placeholder="Isi kategori manual" style="display: none;" />
+            <button type="submit" class="button-primary">Tambahkan Transaksi</button>
+          </form>
+        </article>
+
+        <article class="card card-soft mt-16">
+          <h3>Riwayat Transaksi</h3>
+          <ul id="finance-list" class="item-list"></ul>
+        </article>
+      </section>
+    </main>
+
+    <div id="status-message" class="status-message"></div>
+
+    <div id="notification" class="notification" aria-live="polite"></div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
